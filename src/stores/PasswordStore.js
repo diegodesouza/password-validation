@@ -20,104 +20,98 @@ class PasswordStore {
         {
             type: 'MATCH',
             message: 'Password and Confirm Password must match',
-            valid: false
+            valid: false,
+            matches: function(pw, pwc) {
+                return pw === pwc
+            }
         },
         {
             type: 'MIN_LENGTH',
             message: 'Password has a min length of 6 characters',
-            valid: false
+            valid: false,
+            hasMinLength: function(pw) {
+                return pw.length >= 6
+            }
         },
         {
             type: 'UPPER_CASE',
             message: 'Password has at least 1 uppercase character',
-            valid: false
+            valid: false,
+            hasUpperCase: function(pw) {
+                return /[A-Z]/.test(pw)
+            }
         },
         {
             type: 'LOWER_CASE',
             message: 'Password has at least 1 lowercase character',
-            valid: false
+            valid: false,
+            hasLowerCase: function(pw) {
+              return /[a-z]/.test(pw)
+            }
         },
         {
             type: 'NUMBER',
             message: 'Password has at least 1 number',
-            valid: false
+            valid: false,
+            hasNumber: function(pw) {
+                return /\d/.test(pw)
+            }
         },
         {
             type: 'SPECIAL_CHAR',
             message: `Password has at least 1 special character (!@#$%^&*()_-+={[}]|:;"'<,>.)`,
-            valid: false
-        }]
+            valid: false,
+            hasSpecialChars: function(pw){
+                return /[!@#$%^&*()_+\-=[{\]};':"|,.<>]+/.test(pw)
+            }
+        }
+    ]
 
     constructor() {
         makeAutoObservable(this)
     }
 
-    hasMinLength = pw => pw.length >= 6;
-
-    hasUpperCase = pw => /[A-Z]/.test(pw);
-
-    hasLowerCase = pw => /[a-z]/.test(pw);
-
-    hasNumber = pw => /\d/.test(pw);
-
-    hasSpecialChars = pw => /[!@#$%^&*()_+\-=[{\]};':"|,.<>]+/.test(pw)
-
-    get passwordsMatch() {
-        return this.password.value === this.passwordConfirmation.value
+    setAllValidProp = (bool) => {
+        this.validations = this.validations.map(val => ({...val, valid: bool}))
     }
 
-    handleValidation = (pw, type, bool) => {
-        if (!pw) {
-            this.validations = this.validations.map(val => ({...val, valid: false}))
+    validator = (pw, pwc) => {
+        if (!pw && !pwc) {
+            this.setAllValidProp(false)
+            return;
         }
         this.validations = this.validations.map(val => {
-            if (val.type === type) {
-                return {...val, valid: bool}
+            if (val.type === 'MATCH') {
+                return {...val, valid: val.matches(pw, pwc)}
+            } else if (val.type === 'NUMBER') {
+                return {...val, valid: val.hasNumber(pw)}
+            } else if(val.type === 'MIN_LENGTH') {
+                return {...val, valid: val.hasMinLength(pw)}
+            } else if(val.type === 'LOWER_CASE') {
+                return {...val, valid: val.hasLowerCase(pw)}
+            } else if(val.type === 'UPPER_CASE') {
+                return {...val, valid: val.hasUpperCase(pw)}
+            } else if(val.type === 'SPECIAL_CHAR') {
+                return {...val, valid: val.hasSpecialChars(pw)}
             } else {
                 return val;
             }
         })
     }
-
-    handleMatch = pw => {
-        this.handleValidation(pw, 'MATCH', this.passwordsMatch)
-    }
-
-    handleMinLength = pw => {
-        this.handleValidation(pw, 'MIN_LENGTH', this.hasMinLength(pw))
-    }
-
-    handleUpperCase = pw => {
-        this.handleValidation(pw, 'UPPER_CASE', this.hasUpperCase(pw))
-    }
-
-    handleLowerCase = pw => {
-        this.handleValidation(pw, 'LOWER_CASE', this.hasLowerCase(pw))
-    }
-
-    handleNumber = pw => {
-        this.handleValidation(pw, 'NUMBER', this.hasNumber(pw))
-    }
-
-    handleSpecialChars = pw => {
-        this.handleValidation(pw, 'SPECIAL_CHAR', this.hasSpecialChars(pw))
-    }
     handleSubmit = () => {
-        this.handleMatch(this.password.value)
-        this.handleMinLength(this.password.value)
-        this.handleUpperCase(this.password.value)
-        this.handleLowerCase(this.password.value)
-        this.handleNumber(this.password.value)
-        this.handleSpecialChars(this.password.value)
-        if(this.validations.every(val => val.valid)) {
-            this.validations = this.validations.map(val => ({...val, valid: true}))
-            this.handleChangePasswordStore('showValidations', false)
-            alert('submited')
-        }
-    }
+        this.validator(this.password.value, this.passwordConfirmation.value)
 
-    handlePasswordConfirmationChange = (obj) => {
-        this.passwordConfirmation.value = obj.value
+        // submit if every criterion is valid
+        if(this.validations.every(val => val.valid)) {
+            // reset state
+            this.setAllValidProp(false)
+            this.setPassword('password', '')
+            this.setPassword('passwordConfirmation', '')
+            this.handleChangePasswordStore('showValidations', false)
+            alert('submitted')
+            return true;
+        }
+        return false;
     }
 
     setPassword = (key, value) => {
